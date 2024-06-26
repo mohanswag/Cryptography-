@@ -1,0 +1,153 @@
+#include <stdio.h>
+
+// Key and IV for S-DES CBC mode (binary format)
+unsigned short sdes_key = 0x1FD;     // Key: 01111 11101 in binary (10 bits)
+unsigned char sdes_iv = 0xAA;        // IV: 1010 1010 in binary (8 bits)
+
+// S-DES S-boxes
+unsigned char sbox0[4][4] = {
+    {1, 0, 3, 2},
+    {3, 2, 1, 0},
+    {0, 2, 1, 3},
+    {3, 1, 3, 2}
+};
+
+unsigned char sbox1[4][4] = {
+    {0, 1, 2, 3},
+    {2, 0, 1, 3},
+    {3, 0, 1, 0},
+    {2, 1, 0, 3}
+};
+
+// S-DES Key schedule
+void generate_keys(unsigned short key, unsigned char *k1, unsigned char *k2) {
+    unsigned char temp, t1, t2;
+
+    // Permuted Choice 1
+    temp = ((key >> 1) & 0x1E);  // 0111 1110
+    temp |= (key & 0x01);       // 0111 1111
+
+    // Shift left
+    t1 = (temp & 0x1F) << 1;    // Left shift 5 bits
+    t2 = (temp >> 4) & 0x0F;    // Right shift 5 bits
+
+    // Permuted Choice 2
+    *k1 = (t1 & 0x3C) | ((t2 >> 1) & 0x03); // 4 bits
+    *k2 = ((t1 & 0x03) << 3) | (t2 & 0x07); // 4 bits
+}
+
+// S-DES permutation P4
+unsigned char permute_p4(unsigned char input) {
+    return ((input & 0x02) << 1) | ((input & 0x08) >> 1) | (input & 0x05);
+}
+
+// S-DES round function
+unsigned char sdes_round(unsigned char input, unsigned char key) {
+    unsigned char expanded, sbox_input, sbox_output, p4_output;
+
+    // Expansion Permutation
+    expanded = ((input & 0x08) << 1) | (input & 0x0F);
+
+    // XOR with key
+    sbox_input = expanded ^ key;
+
+    // S-boxes
+    sbox_output = (sbox0[(sbox_input >> 2) & 0x03][sbox_input & 0x03] << 2) |
+                  sbox1[(sbox_input >> 4) & 0x03][sbox_input >> 6];
+
+    // Permutation P4
+    p4_output = permute_p4(sbox_output);
+
+    // Return output of round function
+    return p4_output;
+}
+
+// S-DES encryption function in CBC mode
+void sdes_encrypt_cbc(unsigned char plaintext[], unsigned char ciphertext[], int len) {
+    unsigned char k1, k2, temp;
+    unsigned char prev_cipher = sdes_iv;
+
+    // Generate keys
+    generate_keys(sdes_key, &k1, &k2);
+
+    // Encrypt each byte in CBC mode
+    for (int i = 0; i < len; ++i) {
+        // XOR with previous ciphertext block
+        temp = plaintext[i] ^ prev_cipher;
+
+        // First round
+        temp = sdes_round(temp, k1);
+
+        // Swap nibbles
+        temp = ((temp << 4) & 0xF0) | ((temp >> 4) & 0x0F);
+
+        // Second round
+        temp = sdes_round(temp, k2);
+
+        // Update previous ciphertext block
+        prev_cipher = ciphertext[i] = temp;
+    }
+}
+
+// S-DES decryption function in CBC mode
+void sdes_decrypt_cbc(unsigned char ciphertext[], unsigned char decryptedtext[], int len) {
+    unsigned char k1, k2, temp;
+    unsigned char prev_cipher = sdes_iv;
+
+    // Generate keys
+    generate_keys(sdes_key, &k1, &k2);
+
+    // Decrypt each byte in CBC mode
+    for (int i = 0; i < len; ++i) {
+        temp = ciphertext[i];
+
+        // First round
+        temp = sdes_round(temp, k2);
+
+        // Swap nibbles
+        temp = ((temp << 4) & 0xF0) | ((temp >> 4) & 0x0F);
+
+        // Second round
+        temp = sdes_round(temp, k1);
+
+        // XOR with previous ciphertext block
+        decryptedtext[i] = temp ^ prev_cipher;
+
+        // Update previous ciphertext block
+        prev_cipher = ciphertext[i];
+    }
+}
+
+// Function to print binary data
+void print_binary(unsigned char data[], int len) {
+    for (int i = 0; i < len; ++i) {
+        for (int j = 7; j >= 0; --j) {
+            printf("%d", (data[i] >> j) & 0x01);
+            if (j == 4) printf(" "); // add a space between nibbles
+        }
+        printf(" ");
+    }
+    printf("\n");
+}
+
+int main() {
+    unsigned char plaintext[] = { 0x01, 0x23 }; // Binary plaintext: 0000 0001 0010 0011
+    unsigned char ciphertext[2];
+    unsigned char decryptedtext[2];
+
+    // Encrypt using S-DES CBC mode
+    sdes_encrypt_cbc(plaintext, ciphertext, sizeof(plaintext));
+
+    // Print ciphertext in binary format
+    printf("Ciphertext (Binary): ");
+    print_binary(ciphertext, sizeof(ciphertext));
+
+    // Decrypt using S-DES CBC mode
+    sdes_decrypt_cbc(ciphertext, decryptedtext, sizeof(ciphertext));
+
+    // Print decrypted text in binary format
+    printf("Decrypted Text (Binary): ");
+    print_binary(decryptedtext, sizeof(decryptedtext));
+
+    return 0;
+}
