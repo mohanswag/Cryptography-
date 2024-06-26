@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define ALPHABET_SIZE 26
+
+// English letter frequency table (percentage)
+const float english_freq[ALPHABET_SIZE] = {
+    8.2, 1.5, 2.8, 4.3, 12.7, 2.2, 2.0, 6.1, 7.0, 0.2, 0.8, 4.0, 2.4,
+    6.7, 7.5, 1.9, 0.1, 6.0, 6.3, 9.1, 2.8, 1.0, 2.4, 0.2, 2.0, 0.1
+};
+
+// Function to calculate chi-square value
+float calculate_chi_square(int freq[], int text_length) {
+    float chi_square = 0.0;
+
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        float observed_freq = (float)freq[i] / text_length * 100.0;
+        chi_square += ((observed_freq - english_freq[i]) * (observed_freq - english_freq[i])) / english_freq[i];
+    }
+
+    return chi_square;
+}
+
+// Function to decrypt ciphertext using a given key (monoalphabetic substitution)
+void decrypt_substitution_cipher(char *ciphertext, char *key, char *plaintext) {
+    int length = strlen(ciphertext);
+
+    for (int i = 0; i < length; i++) {
+        if (isalpha(ciphertext[i])) {
+            if (islower(ciphertext[i])) {
+                plaintext[i] = tolower(key[ciphertext[i] - 'a']);
+            } else if (isupper(ciphertext[i])) {
+                plaintext[i] = toupper(key[ciphertext[i] - 'A']);
+            }
+        } else {
+            plaintext[i] = ciphertext[i]; // Keep non-alphabetic characters unchanged
+        }
+    }
+    plaintext[length] = '\0';
+}
+
+// Function to perform letter frequency attack
+void letter_frequency_attack(char *ciphertext, int top_results) {
+    int freq[ALPHABET_SIZE] = {0};
+    int text_length = strlen(ciphertext);
+
+    // Calculate frequency of each letter in the ciphertext
+    for (int i = 0; i < text_length; i++) {
+        if (isalpha(ciphertext[i])) {
+            freq[tolower(ciphertext[i]) - 'a']++;
+        }
+    }
+
+    // Create array to store decrypted plaintexts and their chi-square values
+    struct {
+        char plaintext[100]; // Assuming maximum plaintext length
+        float chi_square;
+    } plaintexts[ALPHABET_SIZE];
+
+    // Try each possible key (permutation of alphabet) and calculate chi-square
+    for (int k = 0; k < ALPHABET_SIZE; k++) {
+        char key[ALPHABET_SIZE];
+        for (int i = 0; i < ALPHABET_SIZE; i++) {
+            key[i] = 'a' + (i + k) % ALPHABET_SIZE; // Create monoalphabetic substitution key
+        }
+        key[ALPHABET_SIZE] = '\0';
+
+        // Decrypt ciphertext using current key
+        decrypt_substitution_cipher(ciphertext, key, plaintexts[k].plaintext);
+
+        // Calculate chi-square value
+        plaintexts[k].chi_square = calculate_chi_square(freq, text_length);
+    }
+
+    // Sort plaintexts by chi-square value (lower is better)
+    for (int i = 0; i < ALPHABET_SIZE - 1; i++) {
+        for (int j = i + 1; j < ALPHABET_SIZE; j++) {
+            if (plaintexts[i].chi_square > plaintexts[j].chi_square) {
+                // Swap entries
+                float temp_chi_square = plaintexts[i].chi_square;
+                plaintexts[i].chi_square = plaintexts[j].chi_square;
+                plaintexts[j].chi_square = temp_chi_square;
+
+                char temp_plaintext[100];
+                strcpy(temp_plaintext, plaintexts[i].plaintext);
+                strcpy(plaintexts[i].plaintext, plaintexts[j].plaintext);
+                strcpy(plaintexts[j].plaintext, temp_plaintext);
+            }
+        }
+    }
+
+    // Print top results
+    printf("Top %d possible plaintexts:\n", top_results);
+    for (int i = 0; i < top_results; i++) {
+        printf("%d. %s (Chi-square: %.2f)\n", i + 1, plaintexts[i].plaintext, plaintexts[i].chi_square);
+    }
+}
+
+int main() {
+    char ciphertext[] = "Gur dhvpx oebja sbk whzcrq bire gur ynml qbt.";
+    int top_results = 10;
+
+    letter_frequency_attack(ciphertext, top_results);
+
+    return 0;
+}
