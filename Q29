@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <time.h>
+
+#define LANE_SIZE 64  // Each lane is 64 bits
+#define STATE_ROWS 5
+#define STATE_COLUMNS 5
+#define MESSAGE_BLOCK_SIZE 1024  // 1024 bits
+
+// Function to check if all capacity lanes have at least one non-zero bit
+bool all_lanes_nonzero(uint64_t state[STATE_ROWS][STATE_COLUMNS], int start_row, int end_row) {
+    for (int i = start_row; i < end_row; i++) {
+        for (int j = 0; j < STATE_COLUMNS; j++) {
+            if (state[i][j] == 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+int main() {
+    // Initialize the state matrix with zeros
+    uint64_t state[STATE_ROWS][STATE_COLUMNS] = {0};
+
+    // Simulated first message block P0 (all lanes have at least one non-zero bit)
+    uint64_t P0[STATE_ROWS][STATE_COLUMNS];
+    srand(time(NULL));
+
+    for (int i = 0; i < STATE_ROWS; i++) {
+        for (int j = 0; j < STATE_COLUMNS; j++) {
+            P0[i][j] = rand() | 1; // Ensuring at least one non-zero bit
+        }
+    }
+
+    // Initial capacity part (assume first STATE_ROWS/2 rows are capacity)
+    int capacity_start_row = 0;
+    int capacity_end_row = STATE_ROWS / 2;
+
+    // Start XORing the message block P0 with the state
+    int steps = 0;
+    while (!all_lanes_nonzero(state, capacity_start_row, capacity_end_row)) {
+        steps++;
+        for (int i = capacity_start_row; i < capacity_end_row; i++) {
+            for (int j = 0; j < STATE_COLUMNS; j++) {
+                state[i][j] ^= P0[i][j]; // XOR operation
+            }
+        }
+    }
+
+    // Print the number of steps until all capacity lanes have at least one non-zero bit
+    printf("It took %d steps for all capacity lanes to have at least one non-zero bit.\n", steps);
+
+    // Optionally, print the state matrix
+    printf("Final state matrix (capacity part):\n");
+    for (int i = capacity_start_row; i < capacity_end_row; i++) {
+        for (int j = 0; j < STATE_COLUMNS; j++) {
+            printf("%016llx ", state[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
