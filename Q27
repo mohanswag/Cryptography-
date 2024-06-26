@@ -1,0 +1,74 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+// Function to perform modular exponentiation (base^exp % mod)
+long long int mod_exp(long long int base, int exp, int mod) {
+    long long int result = 1;
+    base = base % mod;
+    while (exp > 0) {
+        if (exp % 2 == 1) {
+            result = (result * base) % mod;
+        }
+        exp = exp >> 1;
+        base = (base * base) % mod;
+    }
+    return result;
+}
+
+// Function to encrypt a message using RSA
+long long int rsa_encrypt(int plaintext, int e, int n) {
+    return mod_exp(plaintext, e, n);
+}
+
+// Function to demonstrate a dictionary attack on RSA encryption
+void dictionary_attack(int e, int n, long long int *ciphertexts, int len) {
+    int dict[26];
+    // Build a dictionary of encrypted values
+    for (int i = 0; i < 26; i++) {
+        dict[i] = rsa_encrypt(i, e, n);
+    }
+    
+    // Match ciphertexts to plaintexts
+    printf("Decrypted message: ");
+    for (int i = 0; i < len; i++) {
+        for (int j = 0; j < 26; j++) {
+            if (ciphertexts[i] == dict[j]) {
+                printf("%c", 'A' + j);
+                break;
+            }
+        }
+    }
+    printf("\n");
+}
+
+int main() {
+    // RSA parameters
+    int e = 65537; // Public exponent
+    int n = 3233;  // Modulus (normally very large, for demo it's small)
+    
+    // Message to encrypt (example: "HELLO" -> 7 4 11 11 14)
+    char message[] = "HELLO";
+    int plaintext[5];
+    long long int ciphertexts[5];
+    int len = strlen(message);
+    
+    // Convert message to integer array
+    for (int i = 0; i < len; i++) {
+        plaintext[i] = message[i] - 'A';
+    }
+    
+    // Encrypt each character
+    printf("Encrypted message: ");
+    for (int i = 0; i < len; i++) {
+        ciphertexts[i] = rsa_encrypt(plaintext[i], e, n);
+        printf("%lld ", ciphertexts[i]);
+    }
+    printf("\n");
+    
+    // Perform dictionary attack
+    dictionary_attack(e, n, ciphertexts, len);
+    
+    return 0;
+}
