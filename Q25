@@ -1,0 +1,32 @@
+#include <stdio.h>
+
+// Function to calculate modular exponentiation (base^exp % mod)
+long long int mod_exp(long long int base, int exp, int mod) {
+    long long int result = 1;
+    while (exp > 0) {
+        if (exp % 2 == 1) {
+            result = (result * base) % mod;
+        }
+        base = (base * base) % mod;
+        exp /= 2;
+    }
+    return result;
+}
+
+int main() {
+    // RSA parameters (assume known)
+    int p = 61, q = 53; // Example primes
+    int n = p * q;      // Modulus
+    int e = 17;         // Public exponent
+
+    // Plaintext block
+    int plaintext = 1234;
+
+    // Encrypt using RSA encryption
+    long long int ciphertext = mod_exp(plaintext, e, n);
+
+    // Output ciphertext
+    printf("Ciphertext: %lld\n", ciphertext);
+
+    return 0;
+}
