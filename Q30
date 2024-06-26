@@ -1,0 +1,83 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/des.h>
+
+// Define block size (DES block size is 8 bytes)
+#define BLOCK_SIZE 8
+
+// Function to perform XOR on two blocks
+void xor_blocks(unsigned char *out, const unsigned char *in1, const unsigned char *in2, size_t len) {
+    for (size_t i = 0; i < len; ++i) {
+        out[i] = in1[i] ^ in2[i];
+    }
+}
+
+// Function to perform CBC-MAC
+void cbc_mac(unsigned char *mac, const unsigned char *key, const unsigned char *msg, size_t msg_len) {
+    DES_cblock key_block;
+    DES_key_schedule schedule;
+
+    // Copy key to DES_cblock
+    memcpy(key_block, key, BLOCK_SIZE);
+
+    // Set key schedule
+    if (DES_set_key_checked(&key_block, &schedule) != 0) {
+        fprintf(stderr, "Key error.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    unsigned char block[BLOCK_SIZE] = {0}; // Initial block (IV) is zero
+
+    for (size_t i = 0; i < msg_len; i += BLOCK_SIZE) {
+        xor_blocks(block, block, msg + i, BLOCK_SIZE);
+        DES_ecb_encrypt((DES_cblock *)block, (DES_cblock *)block, &schedule, DES_ENCRYPT);
+    }
+
+    memcpy(mac, block, BLOCK_SIZE);
+}
+
+int main() {
+    // Example key and message
+    unsigned char key[BLOCK_SIZE] = "mysecret";  // 8 bytes key
+    unsigned char msg[BLOCK_SIZE] = "message";   // 8 bytes message
+
+    unsigned char mac[BLOCK_SIZE];  // MAC for single block message
+
+    // Compute CBC-MAC for the single block message
+    cbc_mac(mac, key, msg, BLOCK_SIZE);
+
+    // Print the MAC for the single block message
+    printf("MAC for single block message: ");
+    for (int i = 0; i < BLOCK_SIZE; ++i) {
+        printf("%02X ", mac[i]);
+    }
+    printf("\n");
+
+    // Create the two-block message X || (X ⊕ T)
+    unsigned char two_block_msg[2 * BLOCK_SIZE];
+    unsigned char xor_block[BLOCK_SIZE];
+
+    // First block is X
+    memcpy(two_block_msg, msg, BLOCK_SIZE);
+
+    // Compute (X ⊕ T)
+    xor_blocks(xor_block, msg, mac, BLOCK_SIZE);
+
+    // Second block is (X ⊕ T)
+    memcpy(two_block_msg + BLOCK_SIZE, xor_block, BLOCK_SIZE);
+
+    unsigned char mac_two_block[BLOCK_SIZE];  // MAC for two-block message
+
+    // Compute CBC-MAC for the two-block message
+    cbc_mac(mac_two_block, key, two_block_msg, 2 * BLOCK_SIZE);
+
+    // Print the MAC for the two-block message
+    printf("MAC for two-block message: ");
+    for (int i = 0; i < BLOCK_SIZE; ++i) {
+        printf("%02X ", mac_two_block[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
