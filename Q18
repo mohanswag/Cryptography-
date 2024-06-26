@@ -1,0 +1,102 @@
+#include <stdio.h>
+#include <stdint.h>
+
+// Initial permutation table for the key
+static const int PC1[56] = {
+    57, 49, 41, 33, 25, 17, 9,
+    1, 58, 50, 42, 34, 26, 18,
+    10, 2, 59, 51, 43, 35, 27,
+    19, 11, 3, 60, 52, 44, 36,
+    63, 55, 47, 39, 31, 23, 15,
+    7, 62, 54, 46, 38, 30, 22,
+    14, 6, 61, 53, 45, 37, 29,
+    21, 13, 5, 28, 20, 12, 4
+};
+
+// Number of left shifts for each round
+static const int shifts[] = {
+    1, 1, 2, 2, 2, 2, 2, 2,
+    1, 2, 2, 2, 2, 2, 2, 1
+};
+
+// Compression permutation table for the subkey
+static const int PC2[48] = {
+    14, 17, 11, 24, 1, 5,
+    3, 28, 15, 6, 21, 10,
+    23, 19, 12, 4, 26, 8,
+    16, 7, 27, 20, 13, 2,
+    41, 52, 31, 37, 47, 55,
+    30, 40, 51, 45, 33, 48,
+    44, 49, 39, 56, 34, 53,
+    46, 42, 50, 36, 29, 32
+};
+
+// Example initial key (64 bits)
+static const uint64_t initial_key = 0x133457799BBCDFF1;
+
+// Function prototypes
+void generate_subkeys(uint64_t key, uint64_t *subkeys);
+void print_binary(uint64_t num, int bits);
+
+int main() {
+    uint64_t subkeys[16];
+
+    // Generate subkeys
+    generate_subkeys(initial_key, subkeys);
+
+    // Print subkeys
+    printf("Generated Subkeys:\n");
+    for (int i = 0; i < 16; ++i) {
+        printf("Subkey %2d: ", i + 1);
+        print_binary(subkeys[i], 48);
+        printf("\n");
+    }
+
+    return 0;
+}
+
+// Function to generate 16 subkeys for DES
+void generate_subkeys(uint64_t key, uint64_t *subkeys) {
+    // Apply the initial permutation PC1
+    uint64_t permuted_key = 0;
+    for (int i = 0; i < 56; ++i) {
+        int bit_position = 64 - PC1[i];
+        uint64_t bit_value = (key >> (bit_position - 1)) & 0x01;
+        permuted_key |= (bit_value << (55 - i));
+    }
+
+    // Split the 56-bit key into two 28-bit halves
+    uint32_t C = (permuted_key >> 28) & 0xFFFFFFF;
+    uint32_t D = permuted_key & 0xFFFFFFF;
+
+    // Generate 16 subkeys
+    for (int i = 0; i < 16; ++i) {
+        // Apply the left shifts
+        int shift_amount = shifts[i];
+        C = ((C << shift_amount) | (C >> (28 - shift_amount))) & 0xFFFFFFF;
+        D = ((D << shift_amount) | (D >> (28 - shift_amount))) & 0xFFFFFFF;
+
+        // Combine C and D
+        uint64_t combined_CD = ((uint64_t)C << 28) | D;
+
+        // Apply the compression permutation PC2 to generate the subkey
+        uint64_t subkey = 0;
+        for (int j = 0; j < 48; ++j) {
+            int bit_position = 56 - PC2[j];
+            uint64_t bit_value = (combined_CD >> (bit_position - 1)) & 0x01;
+            subkey |= (bit_value << (47 - j));
+        }
+
+        // Store the generated subkey
+        subkeys[i] = subkey;
+    }
+}
+
+// Function to print a number in binary format (specified number of bits)
+void print_binary(uint64_t num, int bits) {
+    for (int i = bits - 1; i >= 0; --i) {
+        printf("%d", (num >> i) & 0x01);
+        if (i % 4 == 0)
+            printf(" ");
+    }
+}
